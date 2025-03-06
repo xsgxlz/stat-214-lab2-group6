@@ -147,3 +147,50 @@ if __name__ == "__main__":
     print(f"Labeled images shape: {labeled_images.shape}")
     print(f"Labeled masks shape: {labeled_masks.shape}")
     print(f"Labels shape: {labels.shape}")
+
+
+def to_NCHW(image):
+    return np.moveaxis(image, -1, 1)
+
+# from (*, a, b) to (*, 384, 384)
+def pad_to_384x384(image):
+    shape = image.shape
+    h, w = shape[-2:]
+    target_h, target_w = 384, 384
+
+    if h > target_h or w > target_w:
+        raise ValueError(
+            f"Image dimensions ({h}x{w}) are larger than the target "
+            f"dimensions ({target_h}x{target_w}). This function only pads, "
+            f"it doesn't crop/resize."
+        )
+
+    pad_h = target_h - h
+    pad_w = target_w - w
+
+    # Pad only at the bottom and right.
+    pad_top = 0
+    pad_bottom = pad_h
+    pad_left = 0
+    pad_right = pad_w
+
+    # Create the padding tuple.  Handles arbitrary leading dimensions.
+    padding = [(0, 0)] * (len(shape) - 2) + [(pad_top, pad_bottom), (pad_left, pad_right)]
+
+    padded_image = np.pad(image, padding, mode='constant')
+    return padded_image
+
+def standardize_images(images, masks, std_channel=None, mean_channel=None):
+    if std_channel is None and mean_channel is None:
+        flattened_images = images.transpose(0, 1).flatten(start_dim=1)
+        flattened_masks = masks.flatten().bool()
+
+        image_content = flattened_images[:, flattened_masks]
+        std_channel = image_content.std(dim=1)
+        mean_channel = image_content.mean(dim=1)
+    elif (std_channel is None) != (mean_channel is None):
+        raise ValueError("std_channel and mean_channel must both be None or both be tensors")
+
+    images = (images - mean_channel.view(1, 8, 1, 1)) / std_channel.view(1, 8, 1, 1)
+    images = images * masks.unsqueeze(1)
+    return images, std_channel, mean_channel
