@@ -108,7 +108,10 @@ def apply_augment(images, masks, augmentation):
     images_masks = torch.stack(images_masks)
     return images_masks[:, 1:], images_masks[:, 0] > 0.5
 
-augment = lambda images, masks: apply_augment(images, masks, augmentation)
+if config.augmentation_flip or config.augmentation_rotate:
+    augment = lambda images, masks: apply_augment(images, masks, augmentation)
+else:
+    augment = lambda images, masks: (images, masks)    
 
 # %%
 encoder_config = [
