@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from typing import List
+
 import torch
 from torch import nn
 from torchvision.models.efficientnet import EfficientNet, MBConvConfig, FusedMBConvConfig, Conv2dNormActivation
@@ -78,3 +81,22 @@ class EfficientNetDecoder(nn.Module):
         x = self.stage1(x)  # 96x96x64 -> 192x192x32
         x = self.stage2(x)  # 192x192x32 -> 384x384x8
         return x
+
+def masked_mse(images, masks, reconstructions):
+    flattened_images = images.transpose(0, 1).flatten(start_dim=1)
+    flattened_reconstructions = reconstructions.transpose(0, 1).flatten(start_dim=1)
+    flattened_masks = masks.flatten().bool()
+
+    image_content = flattened_images[:, flattened_masks]
+    reconstruction_content = flattened_reconstructions[:, flattened_masks]
+
+    return nn.functional.mse_loss(image_content, reconstruction_content)
+
+@dataclass
+class AutoencoderConfig:
+    num_layers_block: List[int]
+    augmentation_flip: bool
+    augmentation_rotate: bool
+
+    def __str__(self):
+        return f"AutoencoderConfig({self.num_layers_block}, flip={self.augmentation_flip}, rotate={self.augmentation_rotate})"
