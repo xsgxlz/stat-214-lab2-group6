@@ -181,6 +181,7 @@ def pad_to_384x384(image):
     return padded_image
 
 def standardize_images(images, masks, std_channel=None, mean_channel=None):
+    C = images.shape[1]
     if std_channel is None and mean_channel is None:
         flattened_images = images.transpose(0, 1).flatten(start_dim=1)
         flattened_masks = masks.flatten().bool()
@@ -191,6 +192,6 @@ def standardize_images(images, masks, std_channel=None, mean_channel=None):
     elif (std_channel is None) != (mean_channel is None):
         raise ValueError("std_channel and mean_channel must both be None or both be tensors")
 
-    images = (images - mean_channel.view(1, 8, 1, 1)) / std_channel.view(1, 8, 1, 1)
+    images = (images - mean_channel.view(1, C, 1, 1)) / std_channel.view(1, C, 1, 1)
     images = images * masks.unsqueeze(1)
     return images, std_channel, mean_channel
