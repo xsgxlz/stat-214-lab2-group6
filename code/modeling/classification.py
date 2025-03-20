@@ -150,3 +150,45 @@ class ConvHead(nn.Module):
             self.layers = nn.Sequential(input_layer, *hidden_layers, output_layer)
     def forward(self, x):
         return self.layers(x)
+
+@torch.compile
+def train_and_validate(
+    train_data, train_labels, val_data, val_labels,
+    in_channels, num_layers, kernel_size, hidden_channels,
+    epochs, lr, weight_decay, optimizer_class, loss_mix_ratio, l1, class_weight,
+    device, return_classifier=False
+):
+    # Create the classifier
+    #classifier = nn.Conv2d(in_channels, 1, kernel_size=kernel_size, 
+    #                      padding="same", padding_mode="replicate").to(device)
+    classifier = ConvHead(in_channels, 1, num_layers, kernel_size, hidden_channels).to(device)
+    classifier.train()
+
+    # Instantiate the optimizer
+    optimizer = optimizer_class(classifier.parameters(), lr=lr, weight_decay=weight_decay)
+
+    # Training loop
+    for epoch in range(epochs):
+        classifier.train()
+        optimizer.zero_grad(set_to_none=True)
+        pred = classifier(train_data)
+
+        bce_loss = masked_bce_loss(pred, train_labels, class_weight=class_weight)
+        hinge_loss = masked_hinge_loss(pred, train_labels, class_weight=class_weight)
+
+        loss = loss_mix_ratio * bce_loss + (1 - loss_mix_ratio) * hinge_loss
+        # Add L1 regularization
+        loss = loss + l1 * l1_reg(classifier)
+        loss.backward()
+        optimizer.step()
+
+    # Validation
+    classifier.eval()
+    with torch.inference_mode():
+        val_pred = classifier(val_data)
+        val_loss, val_acc, val_f1 = masked_hinge_loss(val_pred, val_labels, acc=True, f1=True)
+
+    if return_classifier:
+        return classifier, val_f1, val_acc
+    else:
+        return val_f1, val_acc
