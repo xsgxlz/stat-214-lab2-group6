@@ -1,0 +1,5 @@
+data
+code/modeling/__pycache__
+code/modeling/ckpt
+*.sh
+code/__pycache__/
