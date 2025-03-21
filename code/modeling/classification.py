@@ -1,8 +1,15 @@
 import torch
 import torch.nn as nn
 
-
 def l1_reg(model):
+    """Compute L1 regularization term for a model's weights (excluding biases).
+    
+    Args:
+        model (nn.Module): PyTorch model to compute L1 norm over.
+    
+    Returns:
+        torch.Tensor: Scalar L1 norm of weights.
+    """
     l1 = 0
     for name, param in model.named_parameters():
         if "bias" not in name:
@@ -10,9 +17,27 @@ def l1_reg(model):
     return l1
 
 def accuracy(pred_class, target):
+    """Calculate accuracy between predicted and target binary classes.
+    
+    Args:
+        pred_class (torch.Tensor): Predicted class labels (0 or 1).
+        target (torch.Tensor): True class labels (0 or 1).
+    
+    Returns:
+        torch.Tensor: Scalar accuracy (fraction of correct predictions).
+    """
     return (pred_class == target).float().mean()
 
 def macro_f1_score(pred_class, target):
+    """Compute Macro F1 score for binary classification.
+    
+    Args:
+        pred_class (torch.Tensor): Predicted class labels (0 or 1).
+        target (torch.Tensor): True class labels (0 or 1).
+    
+    Returns:
+        torch.Tensor: Scalar Macro F1 score, averaging F1 for both classes.
+    """
     # F1 for positive class (1)
     tp_pos = ((pred_class == 1) & (target == 1)).sum()
     fp_pos = ((pred_class == 1) & (target == 0)).sum()
@@ -29,7 +54,18 @@ def macro_f1_score(pred_class, target):
     return macro_f1
 
 def masked_bce_loss(pred, label, acc=False, f1=False, class_weight=None):
-    # pred: (N, 1, H, W); label: (N, H, W), with label values -1 (negative), 1 (positive), 0 (masked)
+    """Compute masked binary cross-entropy loss with optional metrics.
+    
+    Args:
+        pred (torch.Tensor): Logits of shape [N, 1, H, W].
+        label (torch.Tensor): Labels of shape [N, H, W] (-1, 1, 0 for masked).
+        acc (bool): If True, return accuracy.
+        f1 (bool): If True, return Macro F1 score.
+        class_weight (str or None): "balanced" for inverse class frequency weights, else None.
+    
+    Returns:
+        torch.Tensor: Scalar BCE loss, or tuple (loss, acc, f1) if acc/f1 requested.
+    """
     pred = pred.flatten()
     label = label.flatten()
     mask = (label != 0)  # valid indices
@@ -71,19 +107,17 @@ def masked_bce_loss(pred, label, acc=False, f1=False, class_weight=None):
     return loss if len(result) == 1 else tuple(result)
 
 def masked_hinge_loss(pred, label, acc=False, f1=False, class_weight=None):
-    """
-    Compute masked hinge loss (SVM-style) with optional accuracy, F1 metrics, and class weights.
+    """Compute masked hinge loss with optional metrics and class weights.
     
     Args:
-        pred: Tensor of shape [N, 1, H, W], logits (unnormalized predictions).
-        label: Tensor of shape [N, H, W], with values -1 (negative), 1 (positive), 0 (masked).
-        acc: Boolean, whether to compute accuracy.
-        f1: Boolean, whether to compute F1 score.
-        class_weight: "balanced" or None. If "balanced", weights are n_samples / (n_classes * counts).
+        pred (torch.Tensor): Logits of shape [N, 1, H, W].
+        label (torch.Tensor): Labels of shape [N, H, W] (-1, 1, 0 for masked).
+        acc (bool): If True, return accuracy.
+        f1 (bool): If True, return Macro F1 score.
+        class_weight (str or None): "balanced" for inverse class frequency weights, else None.
     
     Returns:
-        loss: Hinge loss on valid pixels (scalar tensor).
-        or (loss, acc, f1): Tuple if acc and/or f1 are True.
+        torch.Tensor: Scalar hinge loss, or tuple (loss, acc, f1) if acc/f1 requested.
     """
     pred = pred.flatten()
     label = label.flatten()
@@ -126,12 +160,20 @@ def masked_hinge_loss(pred, label, acc=False, f1=False, class_weight=None):
     return loss if len(result) == 1 else tuple(result)
 
 class ConvBlock(nn.Module):
+    """Convolutional block with batch norm, SiLU activation, and optional residual connection.
+    
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel_size (int): Size of the convolutional kernel.
+    """
     def __init__(self, in_channels, out_channels, kernel_size):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding="same")
         self.bn = nn.BatchNorm2d(out_channels)
         self.activation = nn.SiLU()
         self.residue = (in_channels == out_channels)
+    
     def forward(self, x):
         out = self.activation(self.bn(self.conv(x)))
         if self.residue:
@@ -139,6 +181,15 @@ class ConvBlock(nn.Module):
         return out
 
 class ConvHead(nn.Module):
+    """Lightweight CNN head for pixel-wise classification.
+    
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels (1 for binary classification).
+        num_layers (int): Number of convolutional layers.
+        kernel_size (int): Size of the convolutional kernel.
+        hidden_channels (int): Number of channels in hidden layers.
+    """
     def __init__(self, in_channels, out_channels, num_layers, kernel_size, hidden_channels):
         super().__init__()
         if num_layers == 1:
@@ -148,6 +199,7 @@ class ConvHead(nn.Module):
             hidden_layers = [ConvBlock(hidden_channels, hidden_channels, kernel_size) for _ in range(num_layers - 2)]
             output_layer = nn.Conv2d(hidden_channels, out_channels, kernel_size=kernel_size, padding="same")
             self.layers = nn.Sequential(input_layer, *hidden_layers, output_layer)
+    
     def forward(self, x):
         return self.layers(x)
 
@@ -158,9 +210,31 @@ def train_and_validate(
     epochs, lr, weight_decay, optimizer_class, loss_mix_ratio, l1, class_weight,
     device, return_classifier=False
 ):
+    """Train and validate a CNN classifier with a mixed loss function.
+    
+    Args:
+        train_data (torch.Tensor): Training features [N, C, H, W].
+        train_labels (torch.Tensor): Training labels [N, H, W] (-1, 1, 0).
+        val_data (torch.Tensor): Validation features [N, C, H, W].
+        val_labels (torch.Tensor): Validation labels [N, H, W] (-1, 1, 0).
+        in_channels (int): Input feature channels.
+        num_layers (int): Number of CNN layers.
+        kernel_size (int): Convolutional kernel size.
+        hidden_channels (int): Hidden layer channels.
+        epochs (int): Number of training epochs.
+        lr (float): Learning rate.
+        weight_decay (float): Weight decay for optimizer.
+        optimizer_class (torch.optim.Optimizer): Optimizer class (e.g., SGD, AdamW).
+        loss_mix_ratio (float): Weight for BCE vs. hinge loss (0 to 1).
+        l1 (float): L1 regularization strength.
+        class_weight (str or None): "balanced" or None for loss weighting.
+        device (torch.device): Device to run on (e.g., "cuda").
+        return_classifier (bool): If True, return trained model with metrics.
+    
+    Returns:
+        tuple: (val_f1, val_acc) or (classifier, val_f1, val_acc) if return_classifier=True.
+    """
     # Create the classifier
-    #classifier = nn.Conv2d(in_channels, 1, kernel_size=kernel_size, 
-    #                      padding="same", padding_mode="replicate").to(device)
     classifier = ConvHead(in_channels, 1, num_layers, kernel_size, hidden_channels).to(device)
     classifier.train()
 

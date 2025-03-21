@@ -181,8 +181,3 @@ for epoch in range(num_epochs):
     if epoch + 1 in ckpt:
         torch.save(autoencoder.state_dict(), f"{ckpt_path}/{str(config)}/autoencoder_{epoch + 1}.pth")
     print(f"Epoch {epoch + 1}/{num_epochs} - Loss: {loss:.4f} - Time: {time.perf_counter() - t:.2f}s")
-
-# %%
-
-
-

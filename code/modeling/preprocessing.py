@@ -150,10 +150,30 @@ if __name__ == "__main__":
 
 
 def to_NCHW(image):
+    """
+    Convert image from (..., H, W, C) to (..., C, H, W) format.
+    
+    Args:
+        image (np.ndarray): Input image with shape (..., H, W, C), where C is channels.
+    
+    Returns:
+        np.ndarray: Image with shape (..., C, H, W).
+    """
     return np.moveaxis(image, -1, 1)
 
-# from (*, a, b) to (*, 384, 384)
 def pad_to_384x384(image):
+    """
+    Pad an image to 384x384 spatial dimensions, adding zeros at bottom and right.
+    
+    Args:
+        image (np.ndarray): Input image with shape (..., H, W), where H, W <= 384.
+    
+    Returns:
+        np.ndarray: Padded image with shape (..., 384, 384).
+    
+    Raises:
+        ValueError: If input H or W exceeds 384 (no cropping/resizing supported).
+    """
     shape = image.shape
     h, w = shape[-2:]
     target_h, target_w = 384, 384
@@ -168,19 +188,37 @@ def pad_to_384x384(image):
     pad_h = target_h - h
     pad_w = target_w - w
 
-    # Pad only at the bottom and right.
+    # Pad only at the bottom and right
     pad_top = 0
     pad_bottom = pad_h
     pad_left = 0
     pad_right = pad_w
 
-    # Create the padding tuple.  Handles arbitrary leading dimensions.
+    # Create padding tuple for arbitrary leading dimensions
     padding = [(0, 0)] * (len(shape) - 2) + [(pad_top, pad_bottom), (pad_left, pad_right)]
 
     padded_image = np.pad(image, padding, mode='constant')
     return padded_image
 
 def standardize_images(images, masks, std_channel=None, mean_channel=None):
+    """
+    Standardize images by channel-wise mean and std, masking invalid regions.
+    
+    Args:
+        images (np.ndarray): Input images with shape (N, C, H, W).
+        masks (np.ndarray): Binary masks with shape (N, H, W), True for valid pixels.
+        std_channel (np.ndarray, optional): Precomputed std per channel (shape: (C,)).
+        mean_channel (np.ndarray, optional): Precomputed mean per channel (shape: (C,)).
+    
+    Returns:
+        tuple:
+            - np.ndarray: Standardized images with shape (N, C, H, W), masked to zero where invalid.
+            - np.ndarray: Channel-wise std (shape: (C,)).
+            - np.ndarray: Channel-wise mean (shape: (C,)).
+    
+    Raises:
+        ValueError: If only one of std_channel or mean_channel is provided.
+    """
     C = images.shape[1]
     if std_channel is None and mean_channel is None:
         flattened_images = images.transpose(0, 1).flatten(start_dim=1)
