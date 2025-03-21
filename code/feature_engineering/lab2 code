@@ -1,0 +1,158 @@
+---
+title: "Untitled"
+format: html
+---
+
+```{python}
+import glob
+import numpy as np
+
+# Replace this with the actual path to your image_data folder
+filepaths = glob.glob("/Users/aatef/Desktop/Stats_MA_Spring_2025/Stats 214/lab2/image_data/*.npz")  
+
+print(f"Files found: {filepaths}")  # This will show all matched file paths.
+
+for f in filepaths:
+    npz_data = np.load(f)
+    key = list(npz_data.files)[0]
+    data = npz_data[key]
+    print(f"{f}: shape = {data.shape}")
+
+
+
+```
+
+# 1
+```{python}
+import os
+import glob
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.ensemble import RandomForestClassifier
+
+def load_npz_data_with_labels(data_dir="image_data"):
+    """
+    Load NPZ files with labels from the specified directory, but only include "O013490.npz" and "O013257.npz".
+    """
+    allowed_files = {"O013490.npz", "O013257.npz"}  # Use only these files
+    files = glob.glob(f"{data_dir}/*.npz")
+    all_dfs = []
+    
+    for f in files:
+        file_name = os.path.basename(f)
+        if file_name not in allowed_files:
+            continue  # Skip files that are not in the allowed list
+        
+        npz_data = np.load(f)
+        key = list(npz_data.files)[0]
+        data = npz_data[key]
+        
+        if data.shape[1] == 11:
+            columns = ["y", "x", "NDAI", "SD", "CORR", "feat4", "feat5", "feat6", "feat7", "feat8", "label"]
+        else:
+            continue  # Skip files without labels
+        
+        df = pd.DataFrame(data, columns=columns)
+        all_dfs.append(df)
+    
+    if all_dfs:
+        df_all = pd.concat(all_dfs, ignore_index=True)
+        return df_all
+    else:
+        raise ValueError("No valid labeled files found.")
+
+def plot_correlation_matrix(df):
+    cols = ["NDAI", "SD", "CORR", "feat4", "feat5", "feat6", "feat7", "feat8", "label"]
+    corr = df[cols].corr()
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(corr, annot=True, cmap='coolwarm')
+    plt.title("Correlation Matrix of Features and Label")
+    plt.show()
+
+def compute_mutual_information(df):
+    features = ["NDAI", "SD", "CORR", "feat4", "feat5", "feat6", "feat7", "feat8"]
+    X = df[features]
+    y = df["label"]
+    mi_scores = mutual_info_classif(X, y, random_state=42)
+    mi_df = pd.DataFrame({"Feature": features, "MI Score": mi_scores})
+    mi_df = mi_df.sort_values(by="MI Score", ascending=False)
+    print("Mutual Information Scores:")
+    print(mi_df)
+    return mi_df
+
+def compute_random_forest_importance(df):
+    features = ["NDAI", "SD", "CORR", "feat4", "feat5", "feat6", "feat7", "feat8"]
+    X = df[features]
+    y = df["label"]
+    rf = RandomForestClassifier(n_estimators=100, random_state=42)
+    rf.fit(X, y)
+    importances = rf.feature_importances_
+    imp_df = pd.DataFrame({"Feature": features, "Importance": importances})
+    imp_df = imp_df.sort_values(by="Importance", ascending=False)
+    print("Random Forest Feature Importances:")
+    print(imp_df)
+    return imp_df
+
+def main():
+    df = load_npz_data_with_labels("image_data")
+    print("Data loaded. Shape:", df.shape)
+    plot_correlation_matrix(df)
+    compute_mutual_information(df)
+    compute_random_forest_importance(df)
+
+if __name__ == "__main__":
+    main()
+
+
+```
+
+
+# 2
+```{python}
+import numpy as np
+import pandas as pd
+import scipy.ndimage
+
+def compute_texture_features(df, window_size=5):
+    """
+    Compute texture features (contrast, homogeneity, entropy) using rolling window filtering.
+    """
+    # Convert NDAI to NumPy array
+    values = df["NDAI"].values
+
+    # Define functions for texture feature computations
+    def local_contrast(window):
+        return np.max(window) - np.min(window)
+
+    def local_homogeneity(window):
+        return 1.0 / (1.0 + np.var(window))
+
+    def local_entropy(window):
+        hist, _ = np.histogram(window, bins=10, density=True)
+        hist = hist[hist > 0]  # Remove zero probabilities
+        return -np.sum(hist * np.log2(hist))
+
+    # Apply filters using a rolling window approach
+    df["Contrast"] = scipy.ndimage.generic_filter(values, local_contrast, size=window_size, mode="nearest")
+    df["Homogeneity"] = scipy.ndimage.generic_filter(values, local_homogeneity, size=window_size, mode="nearest")
+    df["Entropy"] = scipy.ndimage.generic_filter(values, local_entropy, size=window_size, mode="nearest")
+
+    return df
+
+# Example usage
+df = load_npz_data_with_labels("image_data")
+df = compute_texture_features(df)
+
+# Save the updated dataframe
+df.to_csv("enhanced_features_no_skimage.csv", index=False)
+print("Feature engineering complete. Saved to enhanced_features_no_skimage.csv")
+
+
+
+
+
+
+```
