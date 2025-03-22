@@ -1,10 +1,6 @@
 
-# File: eda_plots.R
-# Author: Connor McCaffrey
-# Email: connormc@berkeley.edu
-# Date: 3/21/2025
 # Description: A script for generating several EDA plots based on the 3 labeled
-#              MISR images after being processed by clean.py.
+# MISR images after being processed by clean.py.
 
 
 #>---------------------- Load Packages
