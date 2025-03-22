@@ -15,3 +15,6 @@ preprocessing.ipynb: Preprocess the data and save the preprocessed data.
 train_autoencoder.py: Train the Autoencoder model.
 
 The train_autoencoder.sh script under the code directory is designed to run the train_autoencoder.py script with all the possible hyperparameters simultaneously.
+
+
+rf_xgb_modeling_and_analysis.ipynb: Perform end-to-end modeling and post-hoc analysis for the random forest and XGBoost approaches, starting with the data and autoencoder, training RF/XGBoost on various feature sets, hyperparameter search, and cross-validation and test set performance. It also contains post-hoc analysis, which includes feature importance, prediction visualization, variability checks, stability analysis (through perturbation), etc.
