@@ -14,3 +14,4 @@ preprocessing.ipynb: Preprocess the data and save the preprocessed data.
 
 train_autoencoder.py: Train the Autoencoder model.
 
+The train_autoencoder.sh script under the code directory is designed to run the train_autoencoder.py script with all the possible hyperparameters simultaneously.
