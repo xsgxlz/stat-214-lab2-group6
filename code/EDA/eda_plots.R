@@ -167,7 +167,7 @@ corr2 <- df2 %>%
   select(6:11) %>%
   corrplot(corr2.title)
 
-corr3 <- df1 %>%
+corr3 <- df3 %>%
   slice(sample(samp(15000, label))) %>%
   filter(label != 0) %>%
   select(6:11) %>%
